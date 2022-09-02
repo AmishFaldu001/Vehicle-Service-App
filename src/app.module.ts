@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigType } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppointmentModule } from './appointment/appointment.module';
+import { AuthGuard } from './common/guards/auth.guard';
+import { AuthJwtModule } from './common/modules/auth-jwt.module';
 import { applicationConfig } from './config/application.config';
 import { validationSchema } from './config/validation.schema';
 import { UserModule } from './user/user.module';
@@ -34,10 +37,11 @@ import { UserModule } from './user/user.module';
       },
       inject: [applicationConfig.KEY],
     }),
+    AuthJwtModule,
     AppointmentModule,
     UserModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

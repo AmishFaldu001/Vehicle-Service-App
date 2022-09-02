@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, MoreThan, Repository } from 'typeorm';
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { AgencyAvailibilityEntity } from '../agency-availability/entities/agency-availibility.entity';
 import { MessageResponseDto } from '../common/dtos/response-dtos/message.response.dto';
+import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentEntity } from './entities/appointment.entity';
 
@@ -11,22 +12,59 @@ export class AppointmentService {
   constructor(
     @InjectRepository(AppointmentEntity)
     private appointmentRepo: Repository<AppointmentEntity>,
+    @InjectRepository(AgencyAvailibilityEntity)
+    private agencyAvailabilityRepo: Repository<AgencyAvailibilityEntity>,
   ) {}
 
   private async checkIfAppointmentIsAvailable(
     appointmentStartDate: Date,
     appointmentEndDate: Date,
   ): Promise<void> {
-    const appointmentExists = Boolean(
-      (
-        await this.appointmentRepo.findOne({
-          where: {
-            appointmentStartTime: MoreThan(appointmentStartDate.toISOString()),
-            appointmentEndTime: LessThan(appointmentEndDate.toISOString()),
-          },
-        })
-      )?.id,
+    const availableTimes = (await this.agencyAvailabilityRepo.find({}))[0];
+
+    if (!availableTimes) {
+      throw new BadRequestException(
+        'No timeslots available for service booking',
+      );
+    }
+
+    const currentDate = new Date();
+    const agencyStartTime = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      currentDate.getDate(),
+      availableTimes.startHour,
+      0,
+      0,
+      0,
     );
+    const agencyEndTime = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      currentDate.getDate(),
+      availableTimes.endHour,
+      0,
+      0,
+      0,
+    );
+
+    if (
+      appointmentStartDate < agencyStartTime ||
+      appointmentEndDate > agencyEndTime
+    ) {
+      throw new BadRequestException(
+        'No bookings available for out of working hours',
+      );
+    }
+
+    const appointmentExists = await this.appointmentRepo.findOne({
+      where: {
+        appointmentStartTime: MoreThanOrEqual(
+          appointmentStartDate.toISOString(),
+        ),
+        appointmentEndTime: LessThanOrEqual(appointmentEndDate.toISOString()),
+      },
+    });
 
     if (appointmentExists) {
       throw new BadRequestException(
@@ -56,7 +94,8 @@ export class AppointmentService {
 
     const appointment = this.appointmentRepo.create({
       ...createAppointmentDto,
-      vehicleOwnerId: userId,
+      appointmentEndTime: appointmentEndDate.toISOString(),
+      vehicleOwner: userId,
     });
     await this.appointmentRepo.save(appointment);
     return appointment;
@@ -72,7 +111,9 @@ export class AppointmentService {
     limit: number;
   }): Promise<AppointmentEntity[]> {
     const appointments = await this.appointmentRepo.find({
-      where: { vehicleOwnerId: userId },
+      where: {
+        vehicleOwner: { id: userId },
+      },
       skip,
       take: limit,
     });
@@ -88,7 +129,7 @@ export class AppointmentService {
     id: string;
   }): Promise<AppointmentEntity> {
     const appointment = await this.appointmentRepo.findOne({
-      where: { vehicleOwnerId: userId, id },
+      where: { vehicleOwner: { id: userId }, id },
     });
     if (!Boolean(appointment)) {
       throw new BadRequestException('Appointment not found');
@@ -102,6 +143,13 @@ export class AppointmentService {
     id: string,
     updateAppointmentDto: UpdateAppointmentDto,
   ): Promise<AppointmentEntity> {
+    let appointment = await this.appointmentRepo.findOne({
+      where: { id, vehicleOwner: { id: userId } },
+    });
+    if (!appointment) {
+      throw new BadRequestException('Appointment not found');
+    }
+
     // If the appointment time is changed then check if that timeslot is available
     if (Boolean(updateAppointmentDto?.appointmentStartTime)) {
       const appointmentStartDate = new Date(
@@ -118,13 +166,7 @@ export class AppointmentService {
         appointmentStartDate,
         appointmentEndDate,
       );
-    }
-
-    let appointment = await this.appointmentRepo.findOne({
-      where: { id, vehicleOwnerId: userId },
-    });
-    if (Boolean(appointment)) {
-      throw new BadRequestException('Appointment not found');
+      appointment.appointmentEndTime = appointmentEndDate.toISOString();
     }
 
     appointment = { ...appointment, ...updateAppointmentDto };
@@ -135,7 +177,7 @@ export class AppointmentService {
   async remove(userId: string, id: string): Promise<MessageResponseDto> {
     const appointment = await this.appointmentRepo.delete({
       id,
-      vehicleOwnerId: userId,
+      vehicleOwner: { id: userId },
     });
     if (!Boolean(appointment.affected)) {
       throw new BadRequestException('Appointment with that id not found');

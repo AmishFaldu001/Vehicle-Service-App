@@ -3,14 +3,17 @@ import {
   Controller,
   Delete,
   Get,
-  Param,
-  ParseUUIDPipe,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
+import { PublicRoute } from '../common/decorators/public.decorator';
 import { MessageResponseDto } from '../common/dtos/response-dtos/message.response.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { LoginDetailsDto } from './dto/login-details.dto';
+import { LoginResponseDto } from './dto/response/login.response.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserEntity } from './entities/user.entity';
 import { UserService } from './user.service';
@@ -20,26 +23,40 @@ import { UserService } from './user.service';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @PublicRoute()
   @Post()
   create(@Body() createUserDto: CreateUserDto): Promise<UserEntity> {
     return this.userService.create(createUserDto);
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<UserEntity> {
-    return this.userService.findOne(id);
+  @PublicRoute()
+  @Post('login')
+  login(@Body() login: LoginDetailsDto): Promise<LoginResponseDto> {
+    return this.userService.login(login);
   }
 
-  @Patch(':id')
+  @Get()
+  findOne(
+    @Req() request: Request & { user?: { id?: string } },
+  ): Promise<UserEntity> {
+    const userId = request?.user?.id;
+    return this.userService.findOne(userId);
+  }
+
+  @Patch()
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Request & { user?: { id?: string } },
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<UserEntity> {
-    return this.userService.update(id, updateUserDto);
+    const userId = request?.user?.id;
+    return this.userService.update(userId, updateUserDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<MessageResponseDto> {
-    return this.userService.remove(id);
+  @Delete()
+  remove(
+    @Req() request: Request & { user?: { id?: string } },
+  ): Promise<MessageResponseDto> {
+    const userId = request?.user?.id;
+    return this.userService.remove(userId);
   }
 }

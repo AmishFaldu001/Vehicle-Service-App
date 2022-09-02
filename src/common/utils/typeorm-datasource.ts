@@ -9,11 +9,6 @@ async function initApp(): Promise<DataSource> {
   const appConfig: ConfigType<typeof applicationConfig> = app.get(
     applicationConfig.KEY,
   );
-  console.log(
-    appConfig,
-    [process.cwd() + '/dist/migrations/*.js'],
-    [process.cwd() + '/dist/**/*.entity.js'],
-  );
 
   return new DataSource({
     type: 'postgres',

@@ -9,4 +9,7 @@ export const validationSchema = Joi.object({
     then: Joi.string().required(),
     otherwise: Joi.not().required(),
   }),
+  JWT_PRIVATE_KEY: Joi.string().required(),
+  JWT_PUBLIC_KEY: Joi.string().required(),
+  JWT_EXPIRES_IN: Joi.number().positive().required(),
 });

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
@@ -14,6 +15,7 @@ export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    private readonly jwtService: JwtService,
   ) {}
 
   private async checkUserExists(userDetails: { email: string }): Promise<void> {
@@ -48,7 +50,10 @@ export class UserService {
       throw new BadRequestException('Invalid login details');
     }
 
-    return { token: user.password };
+    const token = await this.jwtService.signAsync({
+      user: { id: user.id, email: user.email },
+    });
+    return { token };
   }
 
   async findOne(id: string): Promise<UserEntity> {

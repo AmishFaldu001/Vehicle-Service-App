@@ -2,9 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { UserEntity } from '../../user/entities/user.entity';
 import { VehicleServiceTypeEnum } from '../constants/vehicle-service-type.enum';
 import { VehicleTypeEnum } from '../constants/vehicle-type.enum';
 
@@ -17,8 +20,9 @@ export class AppointmentEntity {
   @Column({ enum: VehicleServiceTypeEnum })
   serviceType: VehicleServiceTypeEnum;
 
-  @Column()
-  vehicleOwnerId: string;
+  @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
+  @JoinColumn()
+  vehicleOwner: string | UserEntity;
 
   @Column({ enum: VehicleTypeEnum })
   vehicleType: VehicleTypeEnum;
@@ -32,11 +36,11 @@ export class AppointmentEntity {
   vehicleModel: string;
 
   // Time after when vehicle service appointment starts
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp with time zone' })
   appointmentStartTime: string;
 
   // Time after when vehicle service appointment is completed
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp with time zone' })
   appointmentEndTime: string;
 
   @CreateDateColumn({ type: 'timestamp with time zone' })
