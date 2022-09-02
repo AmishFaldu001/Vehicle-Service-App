@@ -30,6 +30,14 @@ async function bootstrap(): Promise<void> {
     'An app to book your vehicle service appointments',
   );
   documentBuilder.setVersion('1.0.0');
+  documentBuilder
+    .addSecurity('JWTToken', {
+      type: 'apiKey',
+      description: 'Login Jwt token',
+      in: 'header',
+      name: 'authorization',
+    })
+    .addSecurityRequirements('JWTToken');
   const document = SwaggerModule.createDocument(app, documentBuilder.build());
   SwaggerModule.setup('/api-explorer', app, document);
 

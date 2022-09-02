@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AppointmentModule } from './appointment/appointment.module';
 import { applicationConfig } from './config/application.config';
 import { validationSchema } from './config/validation.schema';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { validationSchema } from './config/validation.schema';
       inject: [applicationConfig.KEY],
     }),
     AppointmentModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
