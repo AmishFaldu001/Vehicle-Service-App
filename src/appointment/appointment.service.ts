@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { AgencyAvailibilityEntity } from '../agency-availability/entities/agency-availibility.entity';
 import { MessageResponseDto } from '../common/dtos/response-dtos/message.response.dto';
+import { EmailService } from '../email/email.service';
+import { UserService } from '../user/user.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentEntity } from './entities/appointment.entity';
@@ -14,6 +16,8 @@ export class AppointmentService {
     private appointmentRepo: Repository<AppointmentEntity>,
     @InjectRepository(AgencyAvailibilityEntity)
     private agencyAvailabilityRepo: Repository<AgencyAvailibilityEntity>,
+    private emailService: EmailService,
+    private userService: UserService,
   ) {}
 
   private async checkIfAppointmentIsAvailable(
@@ -98,6 +102,24 @@ export class AppointmentService {
       vehicleOwner: userId,
     });
     await this.appointmentRepo.save(appointment);
+
+    const user = await this.userService.findOne(userId);
+    appointmentStartDate.setHours(appointmentStartDate.getHours() - 2);
+    const emailSubject = `Vehicle service appointment - ${appointment.id}`;
+    const emailBody = `Your vehicle appointment with following details will start shortly.
+    \n\nAppointment id: ${appointment.id}
+    \nAppointment date: ${appointment.appointmentStartTime}
+    \nService type: ${appointment.serviceType}
+    \nVehicle company: ${appointment.vehicleCompany}
+    \nVehicle model: ${appointment.vehicleModel}
+    \nVehicle type: ${appointment.vehicleType}`;
+    await this.emailService.scheduleMailSend(
+      user.email,
+      appointmentStartDate,
+      emailSubject,
+      emailBody,
+    );
+
     return appointment;
   }
 
@@ -167,6 +189,26 @@ export class AppointmentService {
         appointmentEndDate,
       );
       appointment.appointmentEndTime = appointmentEndDate.toISOString();
+
+      // Reschedule notification mail
+      const user = await this.userService.findOne(userId);
+      await this.emailService.cancelScheduleMail(id, user.email);
+
+      appointmentStartDate.setHours(appointmentStartDate.getHours() - 2);
+      const emailSubject = `Vehicle service appointment - ${appointment.id}`;
+      const emailBody = `Your vehicle appointment with following details will start shortly.
+      \n\nAppointment id: ${appointment.id}
+      \nAppointment date: ${appointment.appointmentStartTime}
+      \nService type: ${appointment.serviceType}
+      \nVehicle company: ${appointment.vehicleCompany}
+      \nVehicle model: ${appointment.vehicleModel}
+      \nVehicle type: ${appointment.vehicleType}`;
+      await this.emailService.scheduleMailSend(
+        user.email,
+        appointmentStartDate,
+        emailSubject,
+        emailBody,
+      );
     }
 
     appointment = { ...appointment, ...updateAppointmentDto };
@@ -175,6 +217,9 @@ export class AppointmentService {
   }
 
   async remove(userId: string, id: string): Promise<MessageResponseDto> {
+    const user = await this.userService.findOne(userId);
+    await this.emailService.cancelScheduleMail(id, user.email);
+
     const appointment = await this.appointmentRepo.delete({
       id,
       vehicleOwner: { id: userId },

@@ -1,0 +1,29 @@
+version: '3.9'
+services:
+  vehicle_service_app:
+    image: vehicle_service_app
+    build:
+      context: .
+      target: run-stage
+      tags:
+        - "v1"
+    depends_on:
+      - database
+    env_file:
+      - .env
+    pull_policy: "if_not_present"
+    restart: "always"
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host
+  database:
+    image: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:rw
+    environment:
+      - POSTGRES_PASSWORD=postgres
+
+volumes:
+  postgres_data:

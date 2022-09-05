@@ -10,6 +10,7 @@ import { AuthJwtModule } from './common/modules/auth-jwt.module';
 import { applicationConfig } from './config/application.config';
 import { validationSchema } from './config/validation.schema';
 import { UserModule } from './user/user.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { UserModule } from './user/user.module';
     AuthJwtModule,
     AppointmentModule,
     UserModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],

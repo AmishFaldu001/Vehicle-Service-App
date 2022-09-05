@@ -14,4 +14,8 @@ export const applicationConfig = registerAs('applicationConfig', () => ({
     publicKey: process.env.JWT_PUBLIC_KEY.replace(/\\n/g, '\n'),
     expiresIn: parseInt(process.env.JWT_EXPIRES_IN),
   },
+  mail: {
+    apiKey: process.env.MAIL_API_KEY,
+    fromEmail: process.env.MAIL_FROM_EMAIL,
+  },
 }));
