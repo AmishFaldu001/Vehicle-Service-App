@@ -36,3 +36,15 @@ lerna-debug.log*
 
 # Env file
 .env
+.env.example
+
+# extranous files
+.dockerignore
+.eslintrc.js
+.gitignore
+.prettierrc
+Dockerfile
+README.md
+
+# Test files
+/test
