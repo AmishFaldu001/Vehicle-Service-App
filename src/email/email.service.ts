@@ -1,6 +1,7 @@
 import * as mailChimp from '@mailchimp/mailchimp_transactional';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
+import dayjs from 'dayjs';
 import { applicationConfig } from '../config/application.config';
 import { CancelScheduledMailDto } from './dtos/response/cancel-scheduled-mail.response.dto';
 import { SendScheduledMailDto } from './dtos/response/send-scheduled-mail.response.dto';
@@ -16,23 +17,26 @@ export class EmailService {
     this.mailchimpClient = mailChimp(this.appConfig.mail.apiKey);
   }
 
-  async scheduleMailSend(
+  async sendMail(
     toEmail: string,
-    sendMailAt: Date,
     emailSubject: string,
     emailContent: string,
+    sendMailAt: dayjs.Dayjs = undefined,
   ): Promise<SendScheduledMailDto> {
     try {
-      const sendMailResponse: any = await this.mailchimpClient.messages.send({
+      const mailBody: mailChimp.MessagesSendRequest = {
         async: true,
-        send_at: sendMailAt.toISOString(),
+        send_at: sendMailAt?.toISOString(),
         message: {
           from_email: this.appConfig.mail.fromEmail,
           to: [{ email: toEmail }],
           subject: emailSubject,
           text: emailContent,
         },
-      });
+      };
+      const sendMailResponse: any = await this.mailchimpClient.messages.send(
+        mailBody,
+      );
 
       if (sendMailResponse?.isAxiosError) {
         const message =
@@ -42,11 +46,11 @@ export class EmailService {
 
       if (sendMailResponse[0].status === 'invalid') {
         throw new Error(
-          `email.service : scheduleMailSend : Invalid recipient status received : mail id = ${sendMailResponse[0]._id} : reject reason = ${sendMailResponse[0].reject_reason} : recipient email = ${sendMailResponse[0].email}`,
+          `email.service : sendMail : Invalid recipient status received : mail id = ${sendMailResponse[0]._id} : reject reason = ${sendMailResponse[0].reject_reason} : recipient email = ${sendMailResponse[0].email}`,
         );
       } else if (sendMailResponse[0].status === 'rejected') {
         throw new Error(
-          `email.service : scheduleMailSend : Rejected recipient status received : mail id = ${sendMailResponse[0]._id} : reject reason = ${sendMailResponse[0].reject_reason} : recipient email = ${sendMailResponse[0].email}`,
+          `email.service : sendMail : Rejected recipient status received : mail id = ${sendMailResponse[0]._id} : reject reason = ${sendMailResponse[0].reject_reason} : recipient email = ${sendMailResponse[0].email}`,
         );
       }
       return { status: 'Success', mailId: sendMailResponse[0]._id };

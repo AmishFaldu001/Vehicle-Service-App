@@ -16,6 +16,7 @@ import { Request } from 'express';
 import { MessageResponseDto } from '../common/dtos/response-dtos/message.response.dto';
 import { AppointmentService } from './appointment.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { AvailableTimeSlotsResponseDto } from './dto/response/available-time-slots.response.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentEntity } from './entities/appointment.entity';
 
@@ -41,6 +42,13 @@ export class AppointmentController {
   ): Promise<AppointmentEntity[]> {
     const userId = request?.user?.id;
     return this.appointmentService.findAll({ userId, skip, limit });
+  }
+
+  @Get('timeslots')
+  findTimeSlots(
+    @Query('date') date: string,
+  ): Promise<AvailableTimeSlotsResponseDto> {
+    return this.appointmentService.findTimeSlots(date);
   }
 
   @Get(':id')
