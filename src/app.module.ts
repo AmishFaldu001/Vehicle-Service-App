@@ -28,7 +28,9 @@ import { EmailModule } from './email/email.module';
           type: 'postgres',
           url: appConfig.database.url,
           ssl: appConfig.database.ssl.enabled
-            ? { ca: appConfig.database.ssl.caCert }
+            ? appConfig.database.ssl.caCert !== 'null'
+              ? { ca: appConfig.database.ssl.caCert }
+              : true
             : false,
           migrations: [__dirname + '/dist/migrations/*.js'],
           synchronize: false,
