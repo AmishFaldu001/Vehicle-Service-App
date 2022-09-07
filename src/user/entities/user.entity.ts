@@ -17,8 +17,8 @@ export class UserEntity {
   @Column({ unique: true })
   email: string;
 
-  @Column()
-  password: string;
+  @Column({ default: false })
+  isEmailVerified: boolean;
 
   @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt: string;

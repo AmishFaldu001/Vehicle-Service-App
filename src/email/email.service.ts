@@ -1,6 +1,8 @@
-import * as mailChimp from '@mailchimp/mailchimp_transactional';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
+import * as sgClient from '@sendgrid/client';
+import { ClientRequest } from '@sendgrid/client/src/request';
+import * as sgMail from '@sendgrid/mail';
 import dayjs from 'dayjs';
 import { applicationConfig } from '../config/application.config';
 import { CancelScheduledMailDto } from './dtos/response/cancel-scheduled-mail.response.dto';
@@ -8,13 +10,30 @@ import { SendScheduledMailDto } from './dtos/response/send-scheduled-mail.respon
 
 @Injectable()
 export class EmailService {
-  private mailchimpClient: mailChimp.ApiClient;
+  private mailClient: sgMail.MailService = sgMail;
 
   constructor(
     @Inject(applicationConfig.KEY)
     private appConfig: ConfigType<typeof applicationConfig>,
   ) {
-    this.mailchimpClient = mailChimp(this.appConfig.mail.apiKey);
+    this.mailClient.setApiKey(this.appConfig.mail.apiKey);
+  }
+
+  async generateBatchId(): Promise<string> {
+    const request: ClientRequest = {
+      url: `/v3/mail/batch`,
+      method: 'POST',
+    };
+
+    try {
+      const [response] = await sgClient.request(request);
+      return (response.body as any).batch_id;
+    } catch (error) {
+      Logger.error(
+        `email.service : generateBatchId : Something went wrong while creating sendgrid batch id : ${error}`,
+      );
+    }
+    return null;
   }
 
   async sendMail(
@@ -24,36 +43,30 @@ export class EmailService {
     sendMailAt: dayjs.Dayjs = undefined,
   ): Promise<SendScheduledMailDto> {
     try {
-      const mailBody: mailChimp.MessagesSendRequest = {
-        async: true,
-        send_at: sendMailAt?.toISOString(),
-        message: {
-          from_email: this.appConfig.mail.fromEmail,
-          to: [{ email: toEmail }],
-          subject: emailSubject,
-          text: emailContent,
-        },
+      let batchId = undefined;
+      if (sendMailAt) {
+        batchId = await this.generateBatchId();
+        if (!batchId) {
+          throw new Error('email.service : sendMail : No batch id generated');
+        }
+      }
+
+      const mailBody: sgMail.MailDataRequired = {
+        to: { email: toEmail },
+        from: { email: this.appConfig.mail.fromEmail },
+        subject: emailSubject,
+        text: emailContent,
+        sendAt: sendMailAt?.unix(),
+        batchId,
       };
-      const sendMailResponse: any = await this.mailchimpClient.messages.send(
-        mailBody,
-      );
+      const [sendMailResponse] = await this.mailClient.send(mailBody);
 
-      if (sendMailResponse?.isAxiosError) {
-        const message =
-          sendMailResponse?.response?.data || sendMailResponse?.message;
-        throw new Error(JSON.stringify(message));
-      }
-
-      if (sendMailResponse[0].status === 'invalid') {
+      if (sendMailResponse.statusCode >= 400) {
         throw new Error(
-          `email.service : sendMail : Invalid recipient status received : mail id = ${sendMailResponse[0]._id} : reject reason = ${sendMailResponse[0].reject_reason} : recipient email = ${sendMailResponse[0].email}`,
-        );
-      } else if (sendMailResponse[0].status === 'rejected') {
-        throw new Error(
-          `email.service : sendMail : Rejected recipient status received : mail id = ${sendMailResponse[0]._id} : reject reason = ${sendMailResponse[0].reject_reason} : recipient email = ${sendMailResponse[0].email}`,
+          `email.service : sendMail : error while sending mail ${sendMailResponse}`,
         );
       }
-      return { status: 'Success', mailId: sendMailResponse[0]._id };
+      return { status: 'Success', mailId: batchId };
     } catch (error) {
       Logger.error(
         `email.service : scheduledMailSend : Something went wrong while sending mail : ${error}`,
@@ -65,28 +78,20 @@ export class EmailService {
     };
   }
 
-  async cancelScheduleMail(
-    appointmentId: string,
-    toEmail: string,
-  ): Promise<CancelScheduledMailDto> {
+  async cancelScheduleMail(batchId: string): Promise<CancelScheduledMailDto> {
     try {
-      const scheduledMails = (await this.mailchimpClient.messages.listScheduled(
-        {
-          to: toEmail,
-        },
-      )) as mailChimp.MessagesScheduledMessageResponse[];
+      const data = {
+        batch_id: batchId,
+        status: 'cancel',
+      };
 
-      const promiseArray = [];
-      scheduledMails.forEach((mail) => {
-        if (mail.subject.includes(appointmentId)) {
-          promiseArray.push(
-            this.mailchimpClient.messages.cancelScheduled({
-              id: mail._id,
-            }),
-          );
-        }
-      });
-      await Promise.all(promiseArray);
+      const request: ClientRequest = {
+        url: `/v3/user/scheduled_sends`,
+        method: 'POST',
+        body: data,
+      };
+
+      await sgClient.request(request);
       return { status: 'Success' };
     } catch (error) {
       Logger.error(

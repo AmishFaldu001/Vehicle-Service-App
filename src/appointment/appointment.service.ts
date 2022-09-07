@@ -173,12 +173,13 @@ export class AppointmentService {
     \nVehicle company: ${appointment.vehicleCompany}
     \nVehicle model: ${appointment.vehicleModel}
     \nVehicle type: ${appointment.vehicleType}`;
-    await this.emailService.sendMail(
+    const { mailId: batchId } = await this.emailService.sendMail(
       user.email,
       emailSubject,
       emailBody,
       mailScheduleDate,
     );
+    await this.appointmentRepo.save({ ...appointment, batchId });
 
     return appointment;
   }
@@ -350,7 +351,7 @@ export class AppointmentService {
 
       // Reschedule notification mail
       const user = await this.userService.findOne(userId);
-      await this.emailService.cancelScheduleMail(id, user.email);
+      await this.emailService.cancelScheduleMail(appointment.batchId);
 
       // We will setup email scheduled to be send 2 hours before timeslot
       const mailSendDate = appointmentStartDate.add(-2, 'hours');
@@ -362,12 +363,13 @@ export class AppointmentService {
       \nVehicle company: ${appointment.vehicleCompany}
       \nVehicle model: ${appointment.vehicleModel}
       \nVehicle type: ${appointment.vehicleType}`;
-      await this.emailService.sendMail(
+      const { mailId: batchId } = await this.emailService.sendMail(
         user.email,
         emailSubject,
         emailBody,
         mailSendDate,
       );
+      appointment.batchId = batchId;
     }
 
     appointment = { ...appointment, ...updateAppointmentDto };
@@ -376,17 +378,15 @@ export class AppointmentService {
   }
 
   async remove(userId: string, id: string): Promise<MessageResponseDto> {
-    const user = await this.userService.findOne(userId);
-    await this.emailService.cancelScheduleMail(id, user.email);
-
-    const appointment = await this.appointmentRepo.delete({
-      id,
-      vehicleOwner: { id: userId },
+    const appointment = await this.appointmentRepo.findOne({
+      where: { id, vehicleOwner: { id: userId } },
     });
-    if (!Boolean(appointment.affected)) {
+    if (!appointment) {
       throw new BadRequestException('Appointment with that id not found');
     }
 
+    await this.emailService.cancelScheduleMail(appointment.batchId);
+    await this.appointmentRepo.remove(appointment);
     return { message: 'Successfully removed appointment' };
   }
 }

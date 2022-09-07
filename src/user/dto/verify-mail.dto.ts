@@ -1,6 +1,9 @@
 import { IsString } from 'class-validator';
 
-export class LoginResponseDto {
+export class VerifyMailDto {
   @IsString()
   token: string;
+
+  @IsString()
+  uniqueId: string;
 }
