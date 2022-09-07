@@ -6,7 +6,7 @@ export const validationSchema = Joi.object({
   DATABASE_SSL_ENABLED: Joi.boolean().default(false),
   DATABASE_SSL_CA_CERT: Joi.alternatives().conditional('DATABASE_SSL_ENABLED', {
     is: true,
-    then: Joi.string().required(),
+    then: Joi.string().default(null),
     otherwise: Joi.not().required(),
   }),
   JWT_PRIVATE_KEY: Joi.string().required(),

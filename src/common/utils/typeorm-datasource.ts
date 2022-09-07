@@ -15,7 +15,9 @@ async function initApp(): Promise<DataSource> {
     url: appConfig.database.url,
 
     ssl: appConfig.database.ssl.enabled
-      ? { ca: appConfig.database.ssl.caCert }
+      ? appConfig.database.ssl.caCert !== 'null'
+        ? { ca: appConfig.database.ssl.caCert }
+        : true
       : false,
     migrations: [process.cwd() + '/dist/migrations/*.js'],
     entities: [process.cwd() + '/dist/**/*.entity.js'],
