@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AgencyAvailibilityEntity } from '../agency-availability/entities/agency-availibility.entity';
+import { AgencyAvailabilityEntity } from '../agency-availability/entities/agency-availability.entity';
 import { EmailModule } from '../email/email.module';
 import { UserModule } from '../user/user.module';
 import { AppointmentController } from './appointment.controller';
@@ -9,7 +9,7 @@ import { AppointmentEntity } from './entities/appointment.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AppointmentEntity, AgencyAvailibilityEntity]),
+    TypeOrmModule.forFeature([AppointmentEntity, AgencyAvailabilityEntity]),
     EmailModule,
     UserModule,
   ],

@@ -43,6 +43,10 @@ export class AppointmentEntity {
   @Column({ type: 'timestamp with time zone' })
   appointmentEndTime: string;
 
+  // Sendgrid batch id. This is used to cancel scheduled mail for appointment reminder
+  @Column({ nullable: true })
+  batchId: string;
+
   @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt: string;
 

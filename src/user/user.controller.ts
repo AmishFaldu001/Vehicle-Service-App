@@ -13,8 +13,9 @@ import { PublicRoute } from '../common/decorators/public.decorator';
 import { MessageResponseDto } from '../common/dtos/response-dtos/message.response.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDetailsDto } from './dto/login-details.dto';
-import { LoginResponseDto } from './dto/response/login.response.dto';
+import { SendVerifyMailDto } from './dto/send-verify-mail.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { VerifyMailDto } from './dto/verify-mail.dto';
 import { UserEntity } from './entities/user.entity';
 import { UserService } from './user.service';
 
@@ -30,8 +31,24 @@ export class UserController {
   }
 
   @PublicRoute()
+  @Post('send-verification-mail')
+  sendVerificationMail(
+    @Body() sendVerifyMailData: SendVerifyMailDto,
+  ): Promise<MessageResponseDto> {
+    return this.userService.sendVerificationMail(sendVerifyMailData);
+  }
+
+  @PublicRoute()
+  @Post('verify-mail')
+  verifyMail(
+    @Body() verifyMailData: VerifyMailDto,
+  ): Promise<MessageResponseDto> {
+    return this.userService.verifyMail(verifyMailData);
+  }
+
+  @PublicRoute()
   @Post('login')
-  login(@Body() login: LoginDetailsDto): Promise<LoginResponseDto> {
+  login(@Body() login: LoginDetailsDto): Promise<MessageResponseDto> {
     return this.userService.login(login);
   }
 

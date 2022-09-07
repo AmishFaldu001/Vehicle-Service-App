@@ -1,13 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { MessageResponseDto } from '../common/dtos/response-dtos/message.response.dto';
+import { EmailService } from '../email/email.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDetailsDto } from './dto/login-details.dto';
-import { LoginResponseDto } from './dto/response/login.response.dto';
+import { SendVerifyMailDto } from './dto/send-verify-mail.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { VerifyMailDto } from './dto/verify-mail.dto';
 import { UserEntity } from './entities/user.entity';
 
 @Injectable()
@@ -16,6 +18,7 @@ export class UserService {
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   private async checkUserExists(userDetails: { email: string }): Promise<void> {
@@ -27,33 +30,87 @@ export class UserService {
 
   async create(createUserDto: CreateUserDto): Promise<UserEntity> {
     await this.checkUserExists({ email: createUserDto.email });
-
-    createUserDto.password = await bcrypt.hash(createUserDto.password, 12);
     const user = this.userRepo.create(createUserDto);
     await this.userRepo.save(user);
+    await this.sendVerificationMail({ email: user.email });
     return user;
   }
 
-  async login(loginDetails: LoginDetailsDto): Promise<LoginResponseDto> {
+  async sendVerificationMail(
+    sendVerifyMailData: SendVerifyMailDto,
+  ): Promise<MessageResponseDto> {
+    const user = await this.userRepo.findOne({
+      where: { email: sendVerifyMailData.email },
+    });
+
+    if (user?.isEmailVerified) {
+      throw new BadRequestException(
+        'Email is already verified!!. You can now login successfully',
+      );
+    }
+
+    if (user) {
+      const uniqueId = uuidv4();
+      const token = await this.jwtService.signAsync({
+        uniqueId,
+        email: user.email,
+      });
+
+      const emailSubject = 'Verify email';
+      const emailBody = `Please verify your mail using below details.\nToken: ${token}\nUnique Id: ${uniqueId}`;
+      await this.emailService.sendMail(user.email, emailSubject, emailBody);
+    }
+    return { message: 'Sent verification mail' };
+  }
+
+  async verifyMail(
+    verifyEmailData: VerifyMailDto,
+  ): Promise<MessageResponseDto> {
+    const jwtPayload = this.jwtService.decode(verifyEmailData.token) as Record<
+      string,
+      unknown
+    >;
+    if (jwtPayload?.uniqueId !== verifyEmailData.uniqueId) {
+      throw new BadRequestException('Invalid token');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { email: jwtPayload.email as string },
+    });
+
+    if (!user) {
+      return { message: 'Invalid verify details' };
+    }
+
+    await this.jwtService.verifyAsync(verifyEmailData.token).catch(() => {
+      throw new BadRequestException('Invalid token');
+    });
+
+    user.isEmailVerified = true;
+    await this.userRepo.save(user);
+    return { message: 'Successfully verified email' };
+  }
+
+  async login(loginDetails: LoginDetailsDto): Promise<MessageResponseDto> {
     const user = await this.userRepo.findOne({
       where: { email: loginDetails.email },
     });
     if (!user) {
-      throw new BadRequestException('Invalid login details');
+      return { message: 'Sent mail with login link' };
     }
 
-    const doesPasswordMatch = await bcrypt.compare(
-      loginDetails.password,
-      user.password,
-    );
-    if (!doesPasswordMatch) {
-      throw new BadRequestException('Invalid login details');
+    if (!user?.isEmailVerified) {
+      throw new BadRequestException('Please verify your email first');
     }
 
     const token = await this.jwtService.signAsync({
       user: { id: user.id, email: user.email },
     });
-    return { token };
+    const emailSubject = 'Login';
+    const emailBody = `Please login using below details.\nToken: ${token}`;
+    await this.emailService.sendMail(user.email, emailSubject, emailBody);
+
+    return { message: 'Sent mail with login link' };
   }
 
   async findOne(id: string): Promise<UserEntity> {
